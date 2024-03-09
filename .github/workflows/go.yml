@@ -12,18 +12,42 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Cache OpenCV
-      id: opencv-cache
-      uses: actions/cache@v2
-      with:
-        path: ./opencv-install
-        key: ${{ runner.os }}-opencv-cache
-    - name: Install OpenCV
-      uses: rayandrews/with-opencv-action@v1
-      with:  
-        dir: ./opencv-install
-        cached: ${{ steps.opencv-cache.outputs.cache-hit }}
-        opencv-version: '4.0.0'
+    - name: Install dependency packages
+      run: |
+        sudo sed -i -E 's|^deb ([^ ]+) (.*)$|deb [arch=amd64] \1 \2\ndeb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ \2|' /etc/apt/sources.list
+        sudo dpkg --add-architecture arm64
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+                crossbuild-essential-arm64 \
+                git \
+                cmake \
+                libpython-dev:arm64 \
+                libpython3-dev:arm64 \
+                python-numpy \
+                python3-numpy
+
+    - name: Fetch opencv_contrib
+      run: |
+        git clone --depth 1 https://github.com/opencv/opencv_contrib.git ../opencv_contrib
+
+    - name: Configure
+      run: |
+        mkdir build
+        cd build
+        cmake -DPYTHON2_INCLUDE_PATH=/usr/include/python2.7/ \
+              -DPYTHON2_LIBRARIES=/usr/lib/aarch64-linux-gnu/libpython2.7.so \
+              -DPYTHON2_NUMPY_INCLUDE_DIRS=/usr/lib/python2.7/dist-packages/numpy/core/include \
+              -DPYTHON3_INCLUDE_PATH=/usr/include/python3.6m/ \
+              -DPYTHON3_LIBRARIES=/usr/lib/aarch64-linux-gnu/libpython3.6m.so \
+              -DPYTHON3_NUMPY_INCLUDE_DIRS=/usr/lib/python3/dist-packages/numpy/core/include \
+              -DCMAKE_TOOLCHAIN_FILE=../platforms/linux/aarch64-gnu.toolchain.cmake \
+              -DOPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules \
+              ../
+
+    - name: Build opencv
+      run: |
+        cd build
+        make -j$(nproc --all)
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
