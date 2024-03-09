@@ -15,7 +15,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Set up OpenCV
-        uses: Dovyski/setup-opencv-action # no @v1 here!
+        uses: Dovyski/setup-opencv-action@v1.1
         with:
           opencv-version: 4.8.1
           GENERATE_PKGCONFIG: ON
