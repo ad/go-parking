@@ -14,7 +14,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+    - uses: Dovyski/setup-opencv-action # no @v1 here!
+      with:
+        opencv-version: 4.8.1
+        GENERATE_PKGCONFIG: ON
+        ENABLE_PRECOMPILED_HEADERS: ON 
 
     - name: Set up Go
       uses: actions/setup-go@v4
