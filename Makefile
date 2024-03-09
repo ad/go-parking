@@ -5,7 +5,7 @@ CWD = $(shell pwd)
 SRC_DIRS := .
 GOCACHE ?= $$(pwd)/.go/cache
 BUILD_VERSION=$(shell cat config.json | awk 'BEGIN { FS="\""; RS="," }; { if ($$2 == "version") {print $$4} }')
-IMAGE ?= danielapatin/telegram-delete-join-messages:${BUILD_VERSION}
+IMAGE ?= danielapatin/go-parking:${BUILD_VERSION}
 
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
