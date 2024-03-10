@@ -1,48 +1,108 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/color"
+	"image/jpeg"
+	"io/ioutil"
+	"mime/multipart"
+	"net/http"
 	"os"
+	"strconv"
 
 	"gocv.io/x/gocv"
 )
 
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Println("[source] [destination]")
+	mux := http.NewServeMux()
+
+	// return form for uploading image
+	mux.HandleFunc("/form", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("get form...")
+		w.Write([]byte(`
+		<html>
+		<body>
+		<form action="/process" method="post" enctype="multipart/form-data">
+		<input type="text" name="target" placeholder="target">
+		<input type="text" name="token" placeholder="token">
+		<input type="checkbox" name="day" value="1"> is day
+		<input type="checkbox" name="update" value="1"> update
+		<input type="file" name="file" />
+		<input type="submit" value="Upload" />
+		</form>
+		</body>	
+		</html>
+		`))
+	})
+
+	mux.HandleFunc("/process", processImage)
+
+	fmt.Println("Server is running on localhost:9991")
+
+	http.ListenAndServe("0.0.0.0:9991", mux)
+}
+
+func processImage(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Processing image...")
+
+	isDay := true
+
+	if r.FormValue("day") == "1" {
+		isDay = true
+	}
+
+	// get file from form
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// convert file to image
+	img, _, err := image.Decode(file)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	source := os.Args[1]
-	dest := os.Args[2]
-
-	img := gocv.IMRead(source, gocv.IMReadColor)
-	if img.Empty() {
-		fmt.Println("Error opening image")
+	imgmat, err := gocv.ImageToMatRGB(img)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	defer img.Close()
+	if imgmat.Empty() {
+		http.Error(w, "Empty image", http.StatusBadRequest)
+		return
+	}
+	defer imgmat.Close()
 
-	rotationMatrix := gocv.GetRotationMatrix2D(image.Point{img.Cols() / 2, img.Rows() / 2}, 10, 0.9)
-	gocv.WarpAffine(img, &img, rotationMatrix, image.Point{img.Cols(), img.Rows()})
-	gocv.WarpAffine(img, &img, rotationMatrix, image.Point{img.Cols(), img.Rows()})
+	rotationMatrix := gocv.GetRotationMatrix2D(image.Point{imgmat.Cols() / 2, imgmat.Rows() / 2}, 10, 0.9)
+	gocv.WarpAffine(imgmat, &imgmat, rotationMatrix, image.Point{imgmat.Cols(), imgmat.Rows()})
+	gocv.WarpAffine(imgmat, &imgmat, rotationMatrix, image.Point{imgmat.Cols(), imgmat.Rows()})
 
-	edges := gocv.NewMatWithSize(img.Cols(), img.Rows(), gocv.MatTypeCV8S)
-	gocv.Canny(img, &edges, 0, 512) // night
-	// gocv.Canny(img, &edges, 196, 512) // day
+	edges := gocv.NewMatWithSize(imgmat.Cols(), imgmat.Rows(), gocv.MatTypeCV8S)
+	if isDay {
+		gocv.Canny(imgmat, &edges, 196, 512) // day
+	} else {
+		gocv.Canny(imgmat, &edges, 0, 512) // night
+	}
 	defer edges.Close()
 
-	gocv.Threshold(edges, &edges, 254, 255, gocv.ThresholdBinaryInv)
-	// gocv.Threshold(edges, &edges, 127, 255, gocv.ThresholdBinaryInv) // day
+	if isDay {
+		gocv.Threshold(edges, &edges, 127, 255, gocv.ThresholdBinaryInv) // day
+	} else {
+		gocv.Threshold(edges, &edges, 254, 255, gocv.ThresholdBinaryInv)
+	}
 
 	croppedMat := edges.Region(image.Rect(655, 351, 1635, 1296))
 	defer croppedMat.Close()
 
-	gocv.IMWrite("edges.jpg", croppedMat)
+	// gocv.IMWrite("edges.jpg", croppedMat)
 
-	outputImg := img.Region(image.Rect(655, 351, 1635, 1296))
+	outputImg := imgmat.Region(image.Rect(655, 351, 1635, 1296))
 	defer outputImg.Close()
 
 	checkRects := []image.Rectangle{
@@ -90,7 +150,7 @@ func main() {
 		image.Rect(253, 665, 326, 717), // 40
 		image.Rect(76, 653, 156, 700),
 		image.Rect(667, 496, 702, 556),
-		image.Rect(71, 882, 140, 920),
+		// image.Rect(71, 882, 140, 920),
 		image.Rect(633, 497, 661, 556),
 		image.Rect(135, 790, 180, 880),
 		image.Rect(1, 878, 28, 939),
@@ -109,10 +169,10 @@ func main() {
 		fmt.Println(i+1, emptyCount, testRegion.Total(), emptyPercentage, "%")
 
 		if emptyPercentage > threshold {
-			// gocv.Rectangle(&outputImg, rect, color.RGBA{0, uint8(255), 0, 0}, 2)
+			gocv.Rectangle(&outputImg, rect, color.RGBA{0, uint8(255), 0, 0}, 2)
 			// Assuming you want to fill the rectangle
-			pts := [][]image.Point{{{rect.Min.X, rect.Min.Y}, {rect.Max.X, rect.Min.Y}, {rect.Max.X, rect.Max.Y}, {rect.Min.X, rect.Max.Y}}}
-			gocv.FillPoly(&outputImg, gocv.NewPointsVectorFromPoints(pts), color.RGBA{0, uint8(255), 0, 0})
+			// pts := [][]image.Point{{{rect.Min.X, rect.Min.Y}, {rect.Max.X, rect.Min.Y}, {rect.Max.X, rect.Max.Y}, {rect.Min.X, rect.Max.Y}}}
+			// gocv.FillPoly(&outputImg, gocv.NewPointsVectorFromPoints(pts), color.RGBA{0, uint8(255), 0, 0})
 			gocv.PutText(
 				&outputImg,
 				fmt.Sprintf("%d", i+1),
@@ -126,28 +186,162 @@ func main() {
 				2,
 			)
 		} else {
-			gocv.PutText(
-				&outputImg,
-				fmt.Sprintf("%d", i+1),
-				image.Pt(
-					rect.Min.X+(rect.Dx()/3),
-					rect.Min.Y+(rect.Dy()/2),
-				),
-				gocv.FontHersheyPlain,
-				0.8,
-				color.RGBA{255, 0, 0, 0},
-				2,
-			)
-			gocv.Rectangle(&outputImg, rect, color.RGBA{uint8(255), 0, 0, uint8(255)}, 1)
+			// gocv.PutText(
+			// 	&outputImg,
+			// 	fmt.Sprintf("%d", i+1),
+			// 	image.Pt(
+			// 		rect.Min.X+(rect.Dx()/3),
+			// 		rect.Min.Y+(rect.Dy()/2),
+			// 	),
+			// 	gocv.FontHersheyPlain,
+			// 	0.8,
+			// 	color.RGBA{255, 0, 0, 0},
+			// 	2,
+			// )
+			// gocv.Rectangle(&outputImg, rect, color.RGBA{uint8(255), 0, 0, uint8(255)}, 1)
 		}
 	}
 
-	gocv.IMWrite(dest, outputImg)
+	output, err := outputImg.ToImage()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	window := gocv.NewWindow("Rectangle")
-	defer window.Close()
-	window.IMShow(croppedMat)
-	rect := window.SelectROIs(croppedMat)
-	fmt.Printf("Selected rect: %+v\n", rect)
-	window.WaitKey(0)
+	chatID, err := strconv.ParseInt(r.FormValue("target"), 10, 64)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	isUpdate := true
+
+	if r.FormValue("update") == "1" {
+		isUpdate = true
+	}
+
+	token := r.FormValue("token")
+
+	if isUpdate {
+		messageID := r.FormValue("message_id")
+		threadID := r.FormValue("thread_id")
+
+		sendImageUpdateToTelegram(output, chatID, messageID, threadID, token)
+
+		return
+	}
+
+	sendImageTotelegram(output, chatID, token)
+}
+
+func sendImageTotelegram(img image.Image, chatID int64, botToken string) {
+	file, err := os.Create("output.jpg")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer file.Close()
+
+	err = jpeg.Encode(file, img, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendPhoto?chat_id=%d", botToken, chatID)
+
+	resp, err := upload(url, img)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println(string(body))
+}
+
+func sendImageUpdateToTelegram(img image.Image, chatID int64, messageID, threadID, botToken string) {
+	file, err := os.Create("output.jpg")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer file.Close()
+
+	err = jpeg.Encode(file, img, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	replyKeyboard := "reply_markup=%7B%22inline_keyboard%22%3A%20%5B%5B%7B%22text%22%3A%20%22Update%20🤓%22%2C%22callback_data%22%3A%20%22%2Fcamera_update%22%7D%5D%5D%7D&media=%7B%22type%22%3A%20%22photo%22%2C%20%22media%22%3A%22attach%3A%2F%2Fphoto%22%7D"
+
+	url := fmt.Sprintf(
+		"https://api.telegram.org/bot%s/editMessageMedia?chat_id=%d&message_id=%smessage_thread_id=%s&disable_notification=true&%s",
+		botToken,
+		chatID,
+		messageID,
+		threadID,
+		replyKeyboard,
+	)
+
+	resp, err := upload(url, img)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println(string(body))
+}
+
+func upload(url string, img image.Image) (*http.Response, error) {
+	client := &http.Client{}
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "multipart/form-data")
+
+	var b bytes.Buffer
+	multipartWriter := multipart.NewWriter(&b)
+	fileWriter, err := multipartWriter.CreateFormFile("photo", "photo.jpg")
+	if err != nil {
+		return nil, err
+	}
+	err = jpeg.Encode(fileWriter, img, nil)
+	if err != nil {
+		return nil, err
+	}
+	multipartWriter.Close()
+
+	contentType := fmt.Sprintf("multipart/form-data; boundary=%s", multipartWriter.Boundary())
+	req.Header.Set("Content-Type", contentType)
+	// req.Header.Set("Content-Length", fmt.Sprintf("%d", body.Len()))
+
+	req.Body = ioutil.NopCloser(&b)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(resp.Status)
+	fmt.Println(resp.Header)
+	fmt.Println(resp.Body)
+
+	return resp, nil
 }
