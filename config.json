@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1",
+  "version": "0.0.6",
   "name": "go-parking",
   "slug": "go-parking",
   "description": "",
@@ -7,7 +7,20 @@
   "boot": "auto",
   "image": "danielapatin/go-parking",
   "arch": ["aarch64", "amd64", "armhf", "armv7", "i386"],
+  "webui": "http://[HOST]:[PORT:9991]/",
+  "panel_admin": true,
+  "panel_icon": "mdi:home-city-outline",
+  "panel_title": "go-parking",
+  "ports": {
+    "9991/tcp": 9991
+  },
+  "ports_description": {
+    "9991/tcp": "Exposed port"
+  },
+  "hassio_api": true,
   "hassio_role": "default",
+  "homeassistant_api": true,
+  "host_network": false,
   "options": {
     "DEBUG": false
   },
