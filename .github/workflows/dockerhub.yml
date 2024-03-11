@@ -25,7 +25,7 @@ jobs:
       - name: Prepare
         id: prep
         run: |
-          DOCKER_IMAGE=${{ secrets.DOCKER_USER }}/vk-callbackapi-to-telegram
+          DOCKER_IMAGE=${{ secrets.DOCKER_USER }}/go-parking
           SHORTREF=${GITHUB_SHA::8}
           echo '${{fromJson(steps.set_var.outputs.packageJson).version}}'
           BUILD_VERSION=${{fromJson(steps.set_var.outputs.packageJson).version}}
