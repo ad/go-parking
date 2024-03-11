@@ -13,19 +13,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Cache OpenCV
-        id: opencv-cache
-        uses: actions/cache@v2
-        with:
-          path: ./opencv-install
-          key: ${{ runner.os }}-opencv-cache
-      - name: Install OpenCV
-        uses: rayandrews/with-opencv-action@v1
-        with:  
-          dir: ./opencv-install
-          cached: ${{ steps.opencv-cache.outputs.cache-hit }}
-          opencv-version: '4.0.0'
+        uses: actions/checkout@v4
       - id: set_var
         run: |
           content=`cat ./config.json`
@@ -37,7 +25,7 @@ jobs:
       - name: Prepare
         id: prep
         run: |
-          DOCKER_IMAGE=${{ secrets.DOCKER_USER }}/go-parking
+          DOCKER_IMAGE=${{ secrets.DOCKER_USER }}/vk-callbackapi-to-telegram
           SHORTREF=${GITHUB_SHA::8}
           echo '${{fromJson(steps.set_var.outputs.packageJson).version}}'
           BUILD_VERSION=${{fromJson(steps.set_var.outputs.packageJson).version}}
