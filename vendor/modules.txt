@@ -1,3 +1,29 @@
-# gocv.io/x/gocv v0.35.0
-## explicit; go 1.13
-gocv.io/x/gocv
+# github.com/ernyoke/imger v1.0.0
+## explicit; go 1.18
+github.com/ernyoke/imger/blend
+github.com/ernyoke/imger/blur
+github.com/ernyoke/imger/convolution
+github.com/ernyoke/imger/edgedetection
+github.com/ernyoke/imger/effects
+github.com/ernyoke/imger/grayscale
+github.com/ernyoke/imger/padding
+github.com/ernyoke/imger/resize
+github.com/ernyoke/imger/transform
+github.com/ernyoke/imger/utils
+# github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
+## explicit
+github.com/golang/freetype/raster
+github.com/golang/freetype/truetype
+# github.com/llgcode/draw2d v0.0.0-20231212091825-f55e0c776b44
+## explicit; go 1.20
+github.com/llgcode/draw2d
+github.com/llgcode/draw2d/draw2dbase
+github.com/llgcode/draw2d/draw2dimg
+github.com/llgcode/draw2d/draw2dkit
+# golang.org/x/image v0.15.0
+## explicit; go 1.18
+golang.org/x/image/draw
+golang.org/x/image/font
+golang.org/x/image/font/basicfont
+golang.org/x/image/math/f64
+golang.org/x/image/math/fixed

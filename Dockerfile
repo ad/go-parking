@@ -35,7 +35,7 @@ ARG BUILD_VERSION
 LABEL \
     io.hass.name="go-parking" \
     io.hass.description="go-parking" \
-    io.hass.arch="${BUILD_ARCH}" \
+    io.hass.arch=${BUILD_ARCH} \
     io.hass.version=${BUILD_VERSION} \
     io.hass.type="addon" \
     maintainer="ad <github@apatin.ru>" \
