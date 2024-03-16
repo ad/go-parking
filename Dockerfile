@@ -10,7 +10,7 @@ WORKDIR $GOPATH/src/app
 COPY . .
 COPY config.json /config.json
 RUN echo "Building for ${TARGETOS}/${TARGETARCH} with version ${BUILD_VERSION}"
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s -X main.version=${BUILD_VERSION}" -o /go/bin/app main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s -X main.version=${BUILD_VERSION}" -o /go/bin/app .
 
 FROM --platform=${TARGETPLATFORM:-linux/amd64} scratch
 WORKDIR /app/
