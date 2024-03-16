@@ -42,6 +42,10 @@ func main() {
 	// return form for uploading image
 	mux.HandleFunc("/form", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("get form...")
+		polygon := polygons[0]
+		min, max := polygon.MinMax()
+		fmt.Println("minMax:", min, max)
+
 		w.Write([]byte(formatForm(r)))
 	})
 
@@ -123,7 +127,24 @@ func processImage(w http.ResponseWriter, r *http.Request) {
 
 	emptyPixel := color.Gray{Y: 0xff}
 
+	min, max := poly.MinMaxMany(polygons)
+	// minMaxPoly := &poly.Poly{
+	// 	XY: []poly.XY{
+	// 		{X: min.X, Y: min.Y},
+	// 		{X: max.X, Y: min.Y},
+	// 		{X: max.X, Y: max.Y},
+	// 		{X: min.X, Y: max.Y},
+	// 	},
+	// }
+	// fmt.Println("minMaxPoly:", min, max)
+	// DrawPolygon(imgRGBA, minMaxPoly, color.RGBA{255, 0, 255, 255})
+
 	utils.ParallelForEachPixel(grayscaleImg.Bounds().Size(), func(x int, y int) {
+		if x < int(min.X*resizeScale) || x > int(max.X*resizeScale) || y < int(min.Y*resizeScale) || y > int(max.Y*resizeScale) {
+			// imgRGBA.Set(int(float64(x)/resizeScale), int(float64(y)/resizeScale), color.RGBA{255, 0, 255, 255})
+			// fmt.Println("out of bounds:", x, y)
+			return
+		}
 		for _, polygon := range polygons {
 			point := poly.XY{X: float64(x) / resizeScale, Y: float64(y) / resizeScale}
 			if point.In(*polygon) {
@@ -155,6 +176,9 @@ func processImage(w http.ResponseWriter, r *http.Request) {
 				DrawLabel(imgRGBA, int(center.X), int(center.Y), fmt.Sprintf("%.1f", percentage), color.RGBA{255, 0, 0, 255})
 				// DrawPolygon(img, polygon, color.RGBA{255, 0, 0, 255})
 			}
+
+			// DrawLabel(imgRGBA, int(center.X), int(center.Y), fmt.Sprintf("%d %.1f", i, percentage), color.RGBA{255, 0, 255, 255})
+
 		}
 	}
 

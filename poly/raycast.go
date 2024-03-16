@@ -103,3 +103,49 @@ func (pt *Poly) Center() XY {
 
 	return centroid
 }
+
+func (pt *Poly) MinMax() (min, max XY) {
+	min = pt.XY[0]
+	max = pt.XY[0]
+
+	for _, v := range pt.XY {
+		if v.X < min.X {
+			min.X = v.X
+		}
+		if v.Y < min.Y {
+			min.Y = v.Y
+		}
+		if v.X > max.X {
+			max.X = v.X
+		}
+		if v.Y > max.Y {
+			max.Y = v.Y
+		}
+	}
+
+	return
+}
+
+func MinMaxMany(polys []*Poly) (min, max XY) {
+	min = polys[0].XY[0]
+	max = polys[0].XY[0]
+
+	for _, pt := range polys {
+		for _, v := range pt.XY {
+			if v.X < min.X {
+				min.X = v.X
+			}
+			if v.Y < min.Y {
+				min.Y = v.Y
+			}
+			if v.X > max.X {
+				max.X = v.X
+			}
+			if v.Y > max.Y {
+				max.Y = v.Y
+			}
+		}
+	}
+
+	return
+}
