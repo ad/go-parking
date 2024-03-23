@@ -155,7 +155,7 @@ func processImage(w http.ResponseWriter, r *http.Request) {
 	})
 
 	font, _ := truetype.Parse(goregular.TTF)
-	face := truetype.NewFace(font, &truetype.Options{Size: 16})
+	face := truetype.NewFace(font, &truetype.Options{Size: 18})
 	imgGG.SetFontFace(face)
 
 	for _, polygon := range polygons {
@@ -166,11 +166,11 @@ func processImage(w http.ResponseWriter, r *http.Request) {
 			// fmt.Println(i, "Percentage:", percentage, "%")
 			if percentage > tresholdEmpty {
 				col := color.RGBA{0, 255, 0, 255}
-				DrawPolygon(imgGG, polygon, col, 3)
+				DrawPolygon(imgGG, polygon, col, 5)
 			}
 
 			if percentage != 100 {
-				DrawStrokeText(imgGG, fmt.Sprintf("%.1f", percentage), center.X, center.Y, color.RGBA{0, 0, 0, 255}, color.RGBA{255, 255, 255, 255}, 2)
+				DrawStrokeText(imgGG, fmt.Sprintf("%.1f", percentage), center.X, center.Y, color.RGBA{0, 0, 0, 255}, color.RGBA{255, 255, 255, 255}, 3)
 			}
 		}
 	}
