@@ -20,6 +20,11 @@ import (
 	"github.com/ernyoke/imger/grayscale"
 	"github.com/ernyoke/imger/resize"
 	"github.com/ernyoke/imger/utils"
+
+	"github.com/fogleman/gg"
+
+	"github.com/golang/freetype/truetype"
+	"golang.org/x/image/font/gofont/goregular"
 )
 
 var formTemplate = `
@@ -96,6 +101,9 @@ func processImage(w http.ResponseWriter, r *http.Request) {
 	imgRGBA := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
 	draw.Draw(imgRGBA, imgRGBA.Bounds(), img, b.Min, draw.Src)
 
+	imgGG := gg.NewContextForRGBA(imgRGBA)
+	imgGG.SetLineWidth(2)
+
 	grayscaleImg := grayscale.Grayscale(imgRGBA)
 	grayscaleImg, err = effects.SharpenGray(grayscaleImg)
 	if err != nil {
@@ -128,32 +136,16 @@ func processImage(w http.ResponseWriter, r *http.Request) {
 	emptyPixel := color.Gray{Y: 0xff}
 
 	min, max := poly.MinMaxMany(polygons)
-	// minMaxPoly := &poly.Poly{
-	// 	XY: []poly.XY{
-	// 		{X: min.X, Y: min.Y},
-	// 		{X: max.X, Y: min.Y},
-	// 		{X: max.X, Y: max.Y},
-	// 		{X: min.X, Y: max.Y},
-	// 	},
-	// }
-	// fmt.Println("minMaxPoly:", min, max)
-	// DrawPolygon(imgRGBA, minMaxPoly, color.RGBA{255, 0, 255, 255})
 
 	utils.ParallelForEachPixel(grayscaleImg.Bounds().Size(), func(x int, y int) {
 		if x < int(min.X*resizeScale) || x > int(max.X*resizeScale) || y < int(min.Y*resizeScale) || y > int(max.Y*resizeScale) {
-			// imgRGBA.Set(int(float64(x)/resizeScale), int(float64(y)/resizeScale), color.RGBA{255, 0, 255, 255})
-			// fmt.Println("out of bounds:", x, y)
 			return
 		}
 		for _, polygon := range polygons {
 			point := poly.XY{X: float64(x) / resizeScale, Y: float64(y) / resizeScale}
 			if point.In(*polygon) {
-				// r, g, _, _ := img.At(x, y).RGBA()
-				// img.Set(x, y, color.RGBA{uint8(r) + 10, uint8(g) + 10, 255, 255})
-
 				pixelGray := imgEdges.At(x, y)
 				if pixelGray != emptyPixel {
-					// img.Set(x, y, color.RGBA{255, 0, 0, 255})
 					polygon.IncNonZero()
 				} else {
 					polygon.IncZero()
@@ -162,6 +154,10 @@ func processImage(w http.ResponseWriter, r *http.Request) {
 		}
 	})
 
+	font, _ := truetype.Parse(goregular.TTF)
+	face := truetype.NewFace(font, &truetype.Options{Size: 16})
+	imgGG.SetFontFace(face)
+
 	for _, polygon := range polygons {
 		if polygon.Zero != 0 {
 			center := polygon.Center()
@@ -169,16 +165,13 @@ func processImage(w http.ResponseWriter, r *http.Request) {
 
 			// fmt.Println(i, "Percentage:", percentage, "%")
 			if percentage > tresholdEmpty {
-				// if percentage > 33 {
-				DrawPolygon(imgRGBA, polygon, color.RGBA{0, 255, 0, 255})
-				DrawLabel(imgRGBA, int(center.X), int(center.Y), fmt.Sprintf("%.1f", percentage), color.RGBA{0, 255, 0, 255})
-			} else {
-				DrawLabel(imgRGBA, int(center.X), int(center.Y), fmt.Sprintf("%.1f", percentage), color.RGBA{255, 0, 0, 255})
-				// DrawPolygon(img, polygon, color.RGBA{255, 0, 0, 255})
+				col := color.RGBA{0, 255, 0, 255}
+				DrawPolygon(imgGG, polygon, col, 3)
 			}
 
-			// DrawLabel(imgRGBA, int(center.X), int(center.Y), fmt.Sprintf("%d %.1f", i, percentage), color.RGBA{255, 0, 255, 255})
-
+			if percentage != 100 {
+				DrawStrokeText(imgGG, fmt.Sprintf("%.1f", percentage), center.X, center.Y, color.RGBA{0, 0, 0, 255}, color.RGBA{255, 255, 255, 255}, 2)
+			}
 		}
 	}
 
@@ -198,6 +191,8 @@ func processImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := r.FormValue("token")
+
+	imgRGBA = imgGG.Image().(*image.RGBA)
 
 	if isUpdate {
 		messageID := r.FormValue("message_id")
@@ -324,18 +319,6 @@ func upload(url string, img image.Image) (*http.Response, error) {
 
 	return resp, nil
 }
-
-// func addLabel(img *image.RGBA, x, y int, label string, col color.RGBA) {
-// 	point := fixed.Point26_6{X: fixed.I(x), Y: fixed.I(y)}
-
-// 	d := &font.Drawer{
-// 		Dst:  img,
-// 		Src:  image.NewUniform(col),
-// 		Face: basicfont.Face7x13,
-// 		Dot:  point,
-// 	}
-// 	d.DrawString(label)
-// }
 
 func formatForm(r *http.Request) string {
 	// Таблица значений переменных
