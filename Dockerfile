@@ -14,7 +14,7 @@ COPY draw.go draw.go
 COPY polygons.go polygons.go
 COPY config.json /config.json
 RUN go version
-RUN CGO_ENABLED=0 go build -mod vendor -ldflags="-w -s -X main.version=${BUILD_VERSION}" -o /go/bin/app main.go
+RUN CGO_ENABLED=0 go build -mod vendor -ldflags="-w -s -X main.version=${BUILD_VERSION}" -o /go/bin/app .
 
 FROM scratch
 WORKDIR /app/
