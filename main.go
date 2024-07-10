@@ -7,7 +7,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/jpeg"
-	"io/ioutil"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"regexp"
@@ -37,7 +37,7 @@ var formTemplate = `
 <input type="file" name="file" />
 <input type="submit" value="Upload" />
 </form>
-</body>	
+</body>
 </html>
 `
 
@@ -230,7 +230,7 @@ func sendImageTotelegram(img image.Image, chatID int64, botToken string) {
 	}
 	defer resp.Body.Close()
 
-	_, err = ioutil.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -271,7 +271,7 @@ func sendImageUpdateToTelegram(img image.Image, chatID int64, messageID, threadI
 	}
 	defer resp.Body.Close()
 
-	_, err = ioutil.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -305,7 +305,7 @@ func upload(url string, img image.Image) (*http.Response, error) {
 	req.Header.Set("Content-Type", contentType)
 	// req.Header.Set("Content-Length", fmt.Sprintf("%d", body.Len()))
 
-	req.Body = ioutil.NopCloser(&b)
+	req.Body = io.NopCloser(&b)
 
 	resp, err := client.Do(req)
 	if err != nil {
