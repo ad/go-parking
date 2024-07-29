@@ -85,7 +85,8 @@ func processImage(w http.ResponseWriter, r *http.Request) {
 	// get file from form
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		fmt.Printf("r.FormFile error: %s", err.Error())
+
 		return
 	}
 	defer file.Close()
@@ -93,7 +94,8 @@ func processImage(w http.ResponseWriter, r *http.Request) {
 	// convert file to image
 	img, _, err := image.Decode(file)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		fmt.Printf("image.Decode error: %s", err.Error())
+
 		return
 	}
 
