@@ -4,7 +4,7 @@ defaultPlatforms:
 
 builds:
 - id: go-parking
-  main: .
+  main: github.com/ad/go-parking/cmd/go-parking
   ldflags:
   - "-s"
   - "-w"
