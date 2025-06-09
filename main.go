@@ -41,6 +41,8 @@ var formTemplate = `
 </html>
 `
 
+var version string
+
 func main() {
 	mux := http.NewServeMux()
 
@@ -56,7 +58,7 @@ func main() {
 
 	mux.HandleFunc("/process", processImage)
 
-	fmt.Println("Server is running on localhost:9991")
+	fmt.Printf("Server v%s is running on localhost:9991", version)
 
 	http.ListenAndServe("0.0.0.0:9991", mux)
 }

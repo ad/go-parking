@@ -1,8 +1,6 @@
 module github.com/ad/go-parking
 
-go 1.23.0
-
-toolchain go1.24.1
+go 1.24
 
 require (
 	github.com/ernyoke/imger v1.0.0

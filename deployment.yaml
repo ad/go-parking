@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-parking
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: go-parking
+  template:
+    metadata:
+      labels:
+        app: go-parking
+    spec:
+      containers:
+        - name: go-parking
+          image: ko://.

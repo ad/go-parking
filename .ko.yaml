@@ -1,0 +1,17 @@
+defaultBaseImage: gcr.io/distroless/static:nonroot
+defaultPlatforms:
+- linux/arm64
+
+builds:
+- id: go-parking
+  main: .
+  ldflags:
+  - "-s"
+  - "-w"
+  - "-X main.version={{.Env.BUILD_VERSION}}"
+
+images:
+  id: go-parking
+  labels:
+    - name: ok
+    - release: "{{.Env.BUILD_VERSION}}"
