@@ -38,7 +38,7 @@ jobs:
         env:
           KO_DOCKER_REPO: ${{ secrets.DOCKER_USER }}/${{ steps.set_var.outputs.repo_name }}
         run: |
-          ko apply -f deployment.yaml --tags={{.Env.BUILD_VERSION}},latest
+          ko apply -f deployment.yaml --tags="${{steps.set_var.outputs.version}},latest"
 
 # name: dockerhub build and push
 # on:
