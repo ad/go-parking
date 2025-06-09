@@ -4,14 +4,8 @@ defaultPlatforms:
 
 builds:
 - id: go-parking
-  main: github.com/ad/go-parking/cmd/go-parking
+  main: ./cmd/go-parking
   ldflags:
   - "-s"
   - "-w"
   - "-X main.version={{.Env.BUILD_VERSION}}"
-
-images:
-  id: go-parking
-  labels:
-    - name: ok
-    - release: "{{.Env.BUILD_VERSION}}"
