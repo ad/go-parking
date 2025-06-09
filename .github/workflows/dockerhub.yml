@@ -36,7 +36,7 @@ jobs:
 
       - name: Deploy
         env:
-          KO_DOCKER_REPO: ${{ secrets.DOCKER_USER }}/${{ steps.set_var.outputs.repo_name }}
+          KO_DOCKER_REPO: ${{ secrets.DOCKER_USER }}
           BUILD_VERSION: ${{ steps.set_var.outputs.version }}
         run: |
           ko apply -f deployment.yaml --base-import-paths --tags="$BUILD_VERSION,latest"
