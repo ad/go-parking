@@ -39,4 +39,4 @@ jobs:
           KO_DOCKER_REPO: ${{ secrets.DOCKER_USER }}
           BUILD_VERSION: ${{ steps.set_var.outputs.version }}
         run: |
-          ko apply -f deployment.yaml --base-import-paths --tags="$BUILD_VERSION,latest"  -- --validate=false
+          ko build ./cmd/go-parking --base-import-paths --tags="$BUILD_VERSION,latest"
