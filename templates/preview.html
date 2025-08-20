@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>go-parking - Preview Polygons</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        form { margin-top: 20px; }
+        input[type="file"] { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+        input[type="submit"] { background: #28a745; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        input[type="submit"]:hover { background: #1e7e34; }
+        .nav { text-align: center; margin-bottom: 20px; }
+        .nav a { margin: 0 10px; padding: 8px 16px; background: #6c757d; color: white; text-decoration: none; border-radius: 5px; }
+        .nav a:hover { background: #5a6268; }
+        .nav a.active { background: #28a745; }
+        .polygon-item { background: #f8f9fa; padding: 10px; margin: 5px 0; border-left: 4px solid #007bff; }
+        .polygon-coords { font-family: monospace; font-size: 0.9em; color: #666; }
+        .color-box { width: 20px; height: 20px; border: 1px solid #ccc; border-radius: 3px; }
+        #result { margin-top: 20px; text-align: center; }
+        #result img { max-width: 100%; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 1.5em; font-weight: bold; color: #007bff; }
+        .stat-label { font-size: 0.9em; color: #666; }
+        .scale-controls { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .scale-controls label { display: inline-block; margin-right: 15px; }
+        .scale-controls input[type="number"] { width: 80px; padding: 5px; }
+        .canvas-container { position: relative; display: inline-block; margin: 20px 0; }
+        .canvas-overlay { position: absolute; top: 0; left: 0; pointer-events: none; }
+        .editor-mode { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .editor-controls { display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap; }
+        .editor-controls button { padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-add { background: #28a745; color: white; }
+        .btn-delete { background: #dc3545; color: white; }
+        .btn-save { background: #007bff; color: white; }
+        .btn-cancel { background: #6c757d; color: white; }
+        .btn-mode { background: #17a2b8; color: white; }
+        .polygon-editor { border: 1px solid #ddd; margin: 20px 0; position: relative; display: none; }
+        .polygon-editor.visible { display: block; }
+        .polygon-editor canvas { display: block; }
+        .polygon-info { background: #f8f9fa; padding: 10px; border-top: 1px solid #ddd; font-size: 0.9em; }
+        .selected-polygon { background: #fff3cd !important; border-left-color: #ffc107 !important; }
+        .mode-indicator { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 3px; font-size: 0.8em; }
+        .polygon-controls { display: flex; gap: 10px; margin: 10px 0; }
+        .polygon-controls input { width: 60px; padding: 3px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="nav">
+        <a href="/form">Process Image</a>
+        <a href="/preview" class="active">Preview Polygons</a>
+        <a href="/config">Config</a>
+    </div>
+    <h1>Parking Polygons</h1>
+    
+    <form action="/preview" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept="image/*" required />
+        
+        <div class="scale-controls">
+            <strong>🔧 Настройки отображения полигонов:</strong><br>
+            <label>
+                Масштаб: <input type="number" name="polygon_scale" value="{{.PolygonScale}}" step="0.1" min="0.1" max="5.0">
+            </label>
+            <label>
+                Смещение X: <input type="number" name="offset_x" value="{{.OffsetX}}" step="1">
+            </label>
+            <label>
+                Смещение Y: <input type="number" name="offset_y" value="{{.OffsetY}}" step="1">
+            </label>
+        </div>
+        
+        <input type="submit" value="Show Polygons on Image" onclick="setFormAction('/preview')" />
+        <input type="submit" value="View Parking Algorithm" onclick="setFormAction('/view_parking_algorithm')" style="margin-left: 10px; background: #28a745;" />
+    </form>
+
+    <div class="editor-mode">
+        <div class="editor-controls">
+            <button class="btn-mode" onclick="setMode('select')">Выбрать</button>
+            <button class="btn-mode" onclick="setMode('add')">Добавить полигон</button>
+            <button class="btn-mode" onclick="setMode('drag')">Перемещать</button>
+            <button class="btn-mode" onclick="setMode('resize')">Изменить размер</button>
+            <button class="btn-delete" onclick="deleteSelected()">Удалить выбранный</button>
+            <button class="btn-save" onclick="savePolygons()">Сохранить изменения</button>
+            <button class="btn-cancel" onclick="resetPolygons()">Отмена</button>
+        </div>
+        
+        <div class="polygon-editor" id="polygonEditor">
+            <div class="mode-indicator" id="modeIndicator">Режим: Выбор</div>
+            <canvas id="polygonCanvas" width="800" height="600"></canvas>
+        </div>
+    </div>
+
+    <div id="result">
+        {{.Result}}
+    </div>
+    
+    <script>
+        let currentMode = 'select';
+        let selectedPolygon = null;
+        let hoveredPolygon = null; // Добавляем отслеживание наведения
+        let polygons = [];
+        let originalPolygons = []; // Сохраняем оригинальные координаты
+        let canvas = null;
+        let ctx = null;
+        let isDragging = false;
+        let dragStart = {x: 0, y: 0};
+        let newPolygonPoints = [];
+        let imageData = null;
+        let polygonScale = {{.PolygonScale}};
+        let offsetX = {{.OffsetX}};
+        let offsetY = {{.OffsetY}};
+        let canvasScale = 1; // Масштаб canvas относительно изображения
+        
+        // // Цвета для полигонов
+        // const colors = [
+        //     'rgba(255,0,0,0.5)', 'rgba(0,255,0,0.5)', 'rgba(0,0,255,0.5)', 'rgba(255,255,0,0.5)',
+        //     'rgba(255,0,255,0.5)', 'rgba(0,255,255,0.5)', 'rgba(255,128,0,0.5)', 'rgba(128,0,255,0.5)'
+        // ];
+        
+        // Инициализация редактора
+        function initEditor() {
+            canvas = document.getElementById('polygonCanvas');
+            ctx = canvas.getContext('2d');
+            
+            // Загружаем текущие полигоны
+            loadPolygons();
+            
+            // Обработчики событий
+            canvas.addEventListener('mousedown', onMouseDown);
+            canvas.addEventListener('mousemove', onMouseMove);
+            canvas.addEventListener('mouseup', onMouseUp);
+            canvas.addEventListener('click', onClick);
+            
+            // Отрисовка
+            drawCanvas();
+        }
+        
+        // Загрузка полигонов из сервера
+        function loadPolygons() {
+            fetch('/api/polygons')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Загружено полигонов:', data.polygons.length);
+                    originalPolygons = data.polygons || [];
+                    // Создаем копию для работы
+                    polygons = JSON.parse(JSON.stringify(originalPolygons));
+                    
+                    // Если изображение уже загружено, преобразуем полигоны
+                    if (imageData) {
+                        transformPolygonsToCanvas(canvasScale, imageData.width, imageData.height);
+                    }
+                    
+                    drawCanvas();
+                    // updatePolygonList();
+                })
+                .catch(error => console.error('Ошибка загрузки полигонов:', error));
+        }
+        
+        // Установка режима редактирования
+        function setMode(mode) {
+            console.log('Смена режима на:', mode);
+            console.log('Canvas размер до смены режима:', canvas.width, 'x', canvas.height);
+            console.log('imageData до смены режима:', imageData ? 'есть' : 'нет');
+            
+            currentMode = mode;
+            selectedPolygon = null;
+            hoveredPolygon = null; // Сбрасываем наведение при смене режима
+            newPolygonPoints = [];
+            
+            const modeNames = {
+                'select': 'Выбор',
+                'add': 'Добавление',
+                'drag': 'Перемещение',
+                'resize': 'Изменение размера'
+            };
+            
+            document.getElementById('modeIndicator').textContent = 'Режим: ' + modeNames[mode];
+            
+            // Изменяем только курсор canvas, не трогая CSS класс родителя
+            const cursorStyles = {
+                'select': 'default',
+                'add': 'crosshair',
+                'drag': 'move',
+                'resize': 'nw-resize'
+            };
+            
+            canvas.style.cursor = cursorStyles[mode] || 'default';
+            
+            console.log('Курсор изменен на:', canvas.style.cursor);
+            console.log('Canvas размер после смены курсора:', canvas.width, 'x', canvas.height);
+            
+            console.log('Перерисовка canvas после смены режима');
+            drawCanvas();
+        }
+        
+        // Отрисовка canvas
+        function drawCanvas() {
+            console.log('drawCanvas вызван. canvas size:', canvas.width, 'x', canvas.height);
+            console.log('imageData:', imageData ? `${imageData.width}x${imageData.height}` : 'null');
+            
+            // Проверяем, не был ли canvas сброшен
+            if (canvas.width === 0 || canvas.height === 0) {
+                console.error('Canvas имеет нулевой размер! Попытка восстановления...');
+                if (imageData) {
+                    const maxWidth = 800;
+                    const maxHeight = 600;
+                    canvasScale = Math.min(maxWidth / imageData.width, maxHeight / imageData.height);
+                    canvas.width = imageData.width * canvasScale;
+                    canvas.height = imageData.height * canvasScale;
+                    console.log('Canvas восстановлен до размера:', canvas.width, 'x', canvas.height);
+                }
+            }
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Рисуем изображение если есть
+            if (imageData) {
+                console.log('Отрисовка изображения');
+                ctx.drawImage(imageData, 0, 0, canvas.width, canvas.height);
+            } else {
+                console.log('Изображение не найдено');
+            }
+            
+            console.log('Отрисовка canvas. Полигонов:', polygons.length);
+            
+            // Рисуем полигоны с масштабированием
+            polygons.forEach((polygon, index) => {
+                if (index < 3) {
+                    console.log(`Рисуем полигон ${index}:`, polygon.points);
+                }
+                const isSelected = index === selectedPolygon;
+                const isHovered = index === hoveredPolygon;
+                drawPolygon(polygon, index, isSelected, isHovered);
+            });
+            
+            // Рисуем новый полигон в процессе создания
+            if (currentMode === 'add' && newPolygonPoints.length > 0) {
+                drawNewPolygon();
+            }
+        }
+        
+        // Отрисовка полигона
+        function drawPolygon(polygon, index, isSelected, isHovered) {
+            const color = 'rgba(0,255,0,0.25)'; //colors[index % colors.length];
+            
+            // Проверяем, что у полигона есть точки
+            if (!polygon.points || polygon.points.length === 0) {
+                console.warn('Полигон', index, 'не имеет точек');
+                return;
+            }
+            
+            ctx.beginPath();
+            ctx.moveTo(polygon.points[0].x, polygon.points[0].y);
+            for (let i = 1; i < polygon.points.length; i++) {
+                ctx.lineTo(polygon.points[i].x, polygon.points[i].y);
+            }
+            ctx.closePath();
+            
+            // Заливка с учетом состояний
+            let fillColor = color;
+            if (isSelected) {
+                fillColor = 'rgba(255,255,0,0.6)'; // Ярко-желтый для выбранного
+            } else if (isHovered) {
+                fillColor = color.replace('0.5', '0.7'); // Более яркий для наведения
+            }
+            
+            ctx.fillStyle = fillColor;
+            ctx.fill();
+            
+            // Контур с учетом состояний
+            let strokeColor = color.replace('0.5', '1');
+            let strokeWidth = 1;
+            
+            if (isSelected) {
+                strokeColor = '#ffc107';
+                strokeWidth = 3;
+            } else if (isHovered) {
+                strokeColor = '#ffffff';
+                strokeWidth = 2;
+            }
+            
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = strokeWidth;
+            ctx.stroke();
+            
+            // Номер полигона с тенью для лучшей видимости
+            const center = getPolygonCenter(polygon);
+            
+            // Тень для текста
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText((index + 1).toString(), center.x + 1, center.y + 6);
+            
+            // Основной текст
+            ctx.fillStyle = 'white';
+            ctx.fillText((index + 1).toString(), center.x, center.y + 5);
+            
+            // Точки для изменения размера (только для выбранного полигона)
+            if (isSelected && currentMode === 'resize') {
+                polygon.points.forEach(point => {
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#007bff';
+                    ctx.fill();
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                });
+            }
+        }
+        
+        // Отрисовка нового полигона
+        function drawNewPolygon() {
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            
+            if (newPolygonPoints.length > 1) {
+                ctx.beginPath();
+                ctx.moveTo(newPolygonPoints[0].x, newPolygonPoints[0].y);
+                for (let i = 1; i < newPolygonPoints.length; i++) {
+                    ctx.lineTo(newPolygonPoints[i].x, newPolygonPoints[i].y);
+                }
+                ctx.stroke();
+            }
+            
+            // Рисуем точки
+            newPolygonPoints.forEach(point => {
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 4, 0, 2 * Math.PI);
+                ctx.fillStyle = 'red';
+                ctx.fill();
+            });
+            
+            ctx.setLineDash([]);
+        }
+        
+        // Обработчики событий мыши
+        function onMouseDown(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            if (currentMode === 'drag' && selectedPolygon !== null) {
+                isDragging = true;
+                dragStart = {x, y};
+            } else if (currentMode === 'resize' && selectedPolygon !== null) {
+                // Проверяем, кликнули ли по точке полигона
+                const point = findNearestPoint(x, y, polygons[selectedPolygon]);
+                if (point !== null) {
+                    isDragging = true;
+                    dragStart = {x, y, pointIndex: point};
+                }
+            }
+        }
+        
+        function onMouseMove(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Обработка перетаскивания
+            if (isDragging) {
+                if (currentMode === 'drag' && selectedPolygon !== null) {
+                    const dx = x - dragStart.x;
+                    const dy = y - dragStart.y;
+                    
+                    // Перемещаем полигон
+                    polygons[selectedPolygon].points.forEach(point => {
+                        point.x += dx;
+                        point.y += dy;
+                    });
+                    
+                    dragStart = {x, y};
+                    drawCanvas();
+                } else if (currentMode === 'resize' && selectedPolygon !== null && dragStart.pointIndex !== undefined) {
+                    // Изменяем размер полигона
+                    polygons[selectedPolygon].points[dragStart.pointIndex].x = x;
+                    polygons[selectedPolygon].points[dragStart.pointIndex].y = y;
+                    drawCanvas();
+                }
+                return;
+            }
+            
+            // Отслеживание наведения в режимах выбора и перемещения
+            if (currentMode === 'select' || currentMode === 'drag' || currentMode === 'resize') {
+                const newHoveredPolygon = findPolygonAtPoint(x, y);
+                
+                if (newHoveredPolygon !== hoveredPolygon) {
+                    hoveredPolygon = newHoveredPolygon;
+                    drawCanvas(); // Перерисовываем для отображения наведения
+                    
+                    // Изменяем курсор
+                    if (hoveredPolygon !== null) {
+                        canvas.style.cursor = 'pointer';
+                    } else {
+                        const cursorStyles = {
+                            'select': 'default',
+                            'add': 'crosshair',
+                            'drag': 'move',
+                            'resize': 'nw-resize'
+                        };
+                        canvas.style.cursor = cursorStyles[currentMode] || 'default';
+                    }
+                }
+            }
+        }
+        
+        function onMouseUp() {
+            isDragging = false;
+            dragStart = {};
+        }
+        
+        function onClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            console.log('Клик по canvas в точке:', x, y, 'режим:', currentMode);
+            
+            if (currentMode === 'select') {
+                // Выбираем полигон
+                const clickedPolygon = findPolygonAtPoint(x, y);
+                console.log('Найден полигон:', clickedPolygon);
+                
+                if (clickedPolygon !== null) {
+                    selectedPolygon = clickedPolygon;
+                    console.log('Выбран полигон:', selectedPolygon + 1);
+                } else {
+                    selectedPolygon = null;
+                    console.log('Полигон не найден, выбор сброшен');
+                }
+                
+                drawCanvas();
+                
+            } else if (currentMode === 'drag') {
+                // В режиме перемещения тоже можем выбрать полигон
+                const clickedPolygon = findPolygonAtPoint(x, y);
+                if (clickedPolygon !== null && selectedPolygon !== clickedPolygon) {
+                    selectedPolygon = clickedPolygon;
+                    console.log('Выбран полигон для перемещения:', selectedPolygon + 1);
+                    drawCanvas();
+                    // updatePolygonInfo();
+                    // updatePolygonList();
+                }
+                
+            } else if (currentMode === 'resize') {
+                // В режиме изменения размера тоже можем выбрать полигон
+                const clickedPolygon = findPolygonAtPoint(x, y);
+                if (clickedPolygon !== null && selectedPolygon !== clickedPolygon) {
+                    selectedPolygon = clickedPolygon;
+                    console.log('Выбран полигон для изменения размера:', selectedPolygon + 1);
+                    drawCanvas();
+                    // updatePolygonInfo();
+                    // updatePolygonList();
+                }
+                
+            } else if (currentMode === 'add') {
+                // Добавляем точку к новому полигону
+                newPolygonPoints.push({x, y});
+                console.log('Добавлена точка:', newPolygonPoints.length, 'из 4');
+                
+                if (newPolygonPoints.length === 4) {
+                    // Создаем новый полигон
+                    polygons.push({
+                        id: Date.now(),
+                        points: [...newPolygonPoints]
+                    });
+                    console.log('Создан новый полигон, всего полигонов:', polygons.length);
+                    newPolygonPoints = [];
+                    setMode('select');
+                    // updatePolygonList();
+                }
+                
+                drawCanvas();
+            }
+        }
+        
+        // Вспомогательные функции
+        function getPolygonCenter(polygon) {
+            let x = 0, y = 0;
+            polygon.points.forEach(point => {
+                x += point.x;
+                y += point.y;
+            });
+            return {x: x / polygon.points.length, y: y / polygon.points.length};
+        }
+        
+        function findPolygonAtPoint(x, y) {
+            console.log('Поиск полигона в точке:', x, y);
+            
+            // Идем с конца, чтобы выбирать верхние полигоны
+            for (let i = polygons.length - 1; i >= 0; i--) {
+                if (isPointInPolygon(x, y, polygons[i])) {
+                    console.log('Найден полигон:', i + 1);
+                    return i;
+                }
+            }
+            
+            console.log('Полигон не найден');
+            return null;
+        }
+        
+        function isPointInPolygon(x, y, polygon) {
+            if (!polygon.points || polygon.points.length < 3) {
+                return false;
+            }
+            
+            let inside = false;
+            const points = polygon.points;
+            
+            for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+                if (((points[i].y > y) !== (points[j].y > y)) &&
+                    (x < (points[j].x - points[i].x) * (y - points[i].y) / (points[j].y - points[i].y) + points[i].x)) {
+                    inside = !inside;
+                }
+            }
+            return inside;
+        }
+        
+        function findNearestPoint(x, y, polygon) {
+            let nearestIndex = null;
+            let minDistance = Infinity;
+            
+            polygon.points.forEach((point, index) => {
+                const distance = Math.sqrt((x - point.x) ** 2 + (y - point.y) ** 2);
+                if (distance < 10 && distance < minDistance) {
+                    minDistance = distance;
+                    nearestIndex = index;
+                }
+            });
+            
+            return nearestIndex;
+        }
+        
+        function selectPolygon(index) {
+            selectedPolygon = index;
+            drawCanvas();
+        }
+        
+        function deletePolygon(index) {
+            if (confirm('Удалить полигон ' + (index + 1) + '?')) {
+                polygons.splice(index, 1);
+                if (selectedPolygon === index) {
+                    selectedPolygon = null;
+                } else if (selectedPolygon > index) {
+                    selectedPolygon--;
+                }
+                drawCanvas();
+            }
+        }
+        
+        function deleteSelected() {
+            if (selectedPolygon !== null) {
+                deletePolygon(selectedPolygon);
+            }
+        }
+        
+        function savePolygons() {
+            // Преобразуем координаты обратно в оригинальный масштаб
+            // 1. Сначала убираем масштаб canvas
+            // 2. Затем убираем смещение и масштаб полигонов
+            const originalPolygons = polygons.map((polygon, index) => ({
+                points: polygon.points.map(point => {
+                    // Обратное преобразование от canvas к изображению
+                    const imgX = point.x / canvasScale;
+                    const imgY = point.y / canvasScale;
+                    
+                    // Обратное преобразование от изображения к оригинальным координатам
+                    const originalX = (imgX - offsetX) / polygonScale;
+                    const originalY = (imgY - offsetY) / polygonScale;
+                    
+                    return {
+                        x: originalX,
+                        y: originalY
+                    };
+                })
+            }));
+            
+            console.log('Сохранение полигонов в конфигурацию:', originalPolygons.length, 'полигонов');
+            console.log('Масштабы при сохранении:', {
+                canvasScale,
+                polygonScale,
+                offsetX,
+                offsetY
+            });
+            
+            fetch('/api/polygons/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({polygons: originalPolygons})
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Ответ сервера:', data);
+                if (data.status === 'success' || data.success) {
+                    alert('Полигоны успешно сохранены в конфигурацию!');
+                } else {
+                    alert('Ошибка сохранения: ' + (data.error || data.message || 'Неизвестная ошибка'));
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                alert('Ошибка сохранения полигонов: ' + error.message);
+            });
+        }
+        
+        function resetPolygons() {
+            if (confirm('Отменить все изменения?')) {
+                loadPolygons();
+            }
+        }
+        
+        // Обработка результата загрузки изображения
+        function onImageLoaded(imageSrc) {
+            const img = new Image();
+            img.onload = function() {
+                console.log('Изображение загружено:', img.width, 'x', img.height);
+                
+                // Масштабируем canvas под изображение
+                const maxWidth = 800;
+                const maxHeight = 600;
+                canvasScale = Math.min(maxWidth / img.width, maxHeight / img.height);
+                
+                console.log('Масштаб canvas:', canvasScale);
+                console.log('Размер canvas:', img.width * canvasScale, 'x', img.height * canvasScale);
+                
+                canvas.width = img.width * canvasScale;
+                canvas.height = img.height * canvasScale;
+                
+                imageData = img;
+                
+                // Загружаем полигоны заново и преобразуем в соответствии с масштабом canvas
+                polygons = JSON.parse(JSON.stringify(originalPolygons));
+                console.log('Полигонов для отображения:', polygons.length);
+                
+                transformPolygonsToCanvas(canvasScale, img.width, img.height);
+                
+                drawCanvas();
+                
+                // Показываем редактор
+                const editorContainer = document.querySelector('.polygon-editor');
+                if (editorContainer) {
+                    editorContainer.classList.add('visible');
+                }
+            };
+            img.src = imageSrc;
+        }
+        
+        // Функция для преобразования полигонов в координаты canvas
+        function transformPolygonsToCanvas(canvasScale, originalWidth, originalHeight) {
+            console.log('Преобразование полигонов:', {
+                canvasScale,
+                polygonScale,
+                offsetX,
+                offsetY,
+                originalWidth,
+                originalHeight
+            });
+            
+            polygons.forEach((polygon, index) => {
+                const originalPoints = JSON.stringify(polygon.points);
+                polygon.points.forEach(point => {
+                    // Сначала применяем масштаб и смещение из настроек
+                    const scaledX = point.x * polygonScale + offsetX;
+                    const scaledY = point.y * polygonScale + offsetY;
+                    
+                    // Затем масштабируем под размер canvas
+                    point.x = scaledX * canvasScale;
+                    point.y = scaledY * canvasScale;
+                });
+                
+                if (index < 3) {
+                    console.log(`Полигон ${index} преобразован:`, originalPoints, '->', JSON.stringify(polygon.points));
+                }
+            });
+        }
+        
+        // Обработка отправки формы
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            
+            const formData = new FormData();
+            const fileInput = document.querySelector('input[type="file"]');
+            
+            if (fileInput.files.length > 0) {
+                formData.append('image', fileInput.files[0]);
+                
+                // Отправляем изображение на сервер для обработки
+                fetch('/preview', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.text())
+                .then(html => {
+                    // Обновляем страницу с результатом анализа
+                    document.body.innerHTML = html;
+                    // Повторно инициализируем редактор
+                    initEditor();
+                })
+                .catch(error => {
+                    console.error('Ошибка загрузки:', error);
+                    alert('Ошибка при загрузке изображения');
+                });
+            }
+        }
+        
+        // Обработка выбора файла изображения
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    onImageLoaded(e.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function setFormAction(action) {
+            document.querySelector('form').action = action;
+        }
+
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            initEditor();
+            
+            // Добавляем обработчик для input файла
+            const fileInput = document.querySelector('input[type="file"]');
+            if (fileInput) {
+                fileInput.addEventListener('change', handleFileSelect);
+            }
+            
+            // Добавляем обработчик для формы
+            const form = document.querySelector('form');
+            if (form) {
+                form.addEventListener('submit', handleFormSubmit);
+            }
+        });
+    </script>
+</div>
+</body>
+</html>

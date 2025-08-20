@@ -19,3 +19,8 @@
 
 # Go workspace file
 go.work
+test-build
+test-build-advanced
+go-parking
+go-parking-enhanced
+go-parking-preview

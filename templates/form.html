@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>go-parking - Upload</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        form { margin-top: 20px; }
+        input[type="text"], input[type="file"] { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+        input[type="submit"] { background: #007bff; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        input[type="submit"]:hover { background: #0056b3; }
+        .nav { text-align: center; margin-bottom: 20px; }
+        .nav a { margin: 0 10px; padding: 8px 16px; background: #6c757d; color: white; text-decoration: none; border-radius: 5px; }
+        .nav a:hover { background: #5a6268; }
+        .nav a.active { background: #007bff; }
+        .scale-controls { margin: 15px 0; }
+        .scale-controls label { display: inline-block; margin-right: 15px; }
+        .scale-controls input[type="number"] { width: 80px; padding: 5px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="nav">
+        <a href="/form" class="active">Process Image</a>
+        <a href="/preview">Preview Polygons</a>
+        <a href="/config">Config</a>
+    </div>
+    <h1>Upload & Process Image</h1>
+    
+    <form action="/process" method="post" enctype="multipart/form-data">
+        <input type="text" name="target" value="{{.Target}}" placeholder="Telegram Chat ID">
+        <input type="text" name="token" value="{{.Token}}" placeholder="Bot Token">
+        
+        <div class="scale-controls">
+            <label>
+                <input type="checkbox" name="day" value="1" {{if .Day}}checked{{end}}> Дневное время
+            </label>
+            <label>
+                Масштаб полигонов: <input type="number" name="polygon_scale" value="{{.PolygonScale}}" step="0.1" min="0.1" max="5.0">
+            </label>
+            <label>
+                Смещение X: <input type="number" name="offset_x" value="{{.OffsetX}}" step="1">
+            </label>
+            <label>
+                Смещение Y: <input type="number" name="offset_y" value="{{.OffsetY}}" step="1">
+            </label>
+        </div>
+        
+        <input type="file" name="file" accept="image/*" required />
+        <div style="margin-top: 20px; text-align: center;">
+            <input type="submit" value="Process & Send to Telegram" onclick="setFormAction('/process')" />
+            <input type="submit" value="Show Polygons on Image" onclick="setFormAction('/show_polygons')" />
+            <input type="submit" value="View Parking Algorithm" onclick="setFormAction('/view_parking_algorithm')" />
+        </div>
+    </form>
+    
+    <script>
+        function setFormAction(action) {
+            document.querySelector('form').action = action;
+        }
+    </script>
+</div>
+</body>
+</html>
